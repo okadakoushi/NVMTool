@@ -1,0 +1,336 @@
+/// <summary>
+/// NavMesh作成用ツール。
+/// </summary>
+
+#include "stdafx.h"
+#include <iostream>
+#include "tkFile/tkmFile.h"
+#include "level/TklFile.h"
+#include "level/Level.h"
+
+//直方体を構成する８頂点。
+enum Rectangular {
+	//ほんとはEnRectangular~~って書かないといけないけど長い・・・。
+	//ツールだからそんなに変数ないし大丈夫かな。todo:EnRectangular??
+	//直方体を構成する頂点番号の規則とかあるのかな？
+	EnFupperLeft,			//手前左上。
+	EnFlowerLeft,			//手前左下。
+	EnFupperRight,			//手前右上。
+	EnFlowerRight,			//手前右下。
+	EnBupperLeft,			//奥左上。
+	EnBlowerLeft,			//奥左下。
+	EnBupperRight,			//奥右上。
+	EnBlowerRight,			//奥右下。
+	EnRectangular_Num
+};
+
+/// <summary>
+/// セル。
+/// </summary>
+struct Cell {
+	Vector3 pos[3];
+	Cell* linkCell[3];
+};
+/// <summary>
+/// ナビゲーションメッシュ。
+/// </summary>
+struct NaviMesh {
+	std::vector<Cell>	m_cell;
+};
+/// <summary>
+/// 障害物。
+/// </summary>
+struct Obstacle {
+	Vector3 v[EnRectangular_Num];	//8頂点。
+	int ObjNo = 0;					//一応オブジェクトナンバー。
+};
+/// <summary>
+/// 線分。
+/// </summary>
+struct Line {
+	Vector3 SPoint;	//始点。
+	Vector3 EPoint;	//終点。
+};
+/// <summary>
+/// AABB。
+/// </summary>
+struct AABB {
+	Vector3 v[8];	//AABBを構成する８点。
+	Line line[12];	//AABBを構成する線分１２本。
+};
+
+/// <summary>
+/// 一つのメッシュからナビゲーションメッシュのセルを作成。
+/// </summary>
+/// <returns></returns>
+template<class TIndexBuffer> 
+void BuildCellsFromOneMesh(
+	NaviMesh& naviMesh,
+	const TIndexBuffer& indexBuffer, 
+	const TkmFile::SMesh& mesh
+)
+{
+	for (auto& indexBuffer : indexBuffer) {
+		//3つの頂点で1ポリなので、インデックス数 / 3でポリゴン数。
+		int numPolygon = static_cast<int>(indexBuffer.indices.size() / 3);
+		for (int i = 0; i < numPolygon; i++) {
+			int no_0 = i * 3;
+			int no_1 = i * 3 + 1;
+			int no_2 = i * 3 + 2;
+			//頂点番号を取得。
+			int vertNo_0 = indexBuffer.indices[no_0];
+			int vertNo_1 = indexBuffer.indices[no_1];
+			int vertNo_2 = indexBuffer.indices[no_2];
+			//頂点からセルを作成。
+			Cell c;
+			c.pos[0] = mesh.vertexBuffer[vertNo_0].pos;
+			c.pos[1] = mesh.vertexBuffer[vertNo_1].pos;
+			c.pos[2] = mesh.vertexBuffer[vertNo_2].pos;
+			naviMesh.m_cell.push_back(c);
+		}
+	}
+}
+
+/// <summary>
+/// AABBを計算。
+/// <para>メンバでない値を返却するため参照にしないこと。</para>
+/// </summary>
+/// <param name="aabb">AABB格納用。</param>
+/// <param name="vMax">最大頂点。</param>
+/// <param name="vMin">最小頂点。</param>
+/// <returns>AABB。</returns>
+void CalcAABB(AABB& aabb, Vector3& vMax, Vector3& vMin)
+{
+	//8頂点を計算＆代入していく。
+	//ZUPなことに注意！！
+	aabb.v[EnFupperLeft] = { vMin.x, vMin.y, vMax.z };
+	aabb.v[EnFlowerLeft] = { vMin.x, vMin.y, vMin.z };
+	aabb.v[EnFupperRight] = { vMax.x, vMin.y, vMax.z };
+	aabb.v[EnFlowerRight] = { vMax.x, vMin.y, vMin.z };
+	aabb.v[EnBupperLeft] = { vMin.x, vMax.y, vMax.z };
+	aabb.v[EnBlowerLeft] = { vMin.x, vMax.y, vMin.z };
+	aabb.v[EnBupperRight] = { vMax.x, vMax.y, vMax.z };
+	aabb.v[EnBlowerRight] = { vMax.x, vMax.y, vMin.z };
+}
+
+/// <summary>
+/// 線分とセルの衝突判定。
+/// </summary>
+/// <param name="spoint">線分始点。</param>
+/// <param name="epoint">線分終点。</param>
+/// <param name="cell">セル。</param>
+/// <returns>衝突しているならTrue/していないならFalse。</returns>
+bool IntersectPlaneAndLine(
+	Vector3& spoint,
+	Vector3& epoint,
+	Cell& cell
+)
+{
+	//セルの法線を求めていく。
+	Vector3 v0 = cell.pos[0];
+	Vector3 v1 = cell.pos[1];
+	Vector3 v2 = cell.pos[2];
+	//AB,BC。
+	Vector3 nom = v1 - v0;
+	Vector3 v1Tov2 = v2 - v1;
+	//外積を計算。
+	nom.Cross(v1Tov2);
+	//平面の方程式のd(法線の長さ？)も求める。
+	float d = nom.Length();
+	//nom.Normalize();
+
+	//平面上の点Pを求める。あってるかなぁ？
+	Vector3 P = { nom.x * d, nom.y * d, nom.z * d };
+
+	//PA,PBを求めていく。
+	Vector3 PA, PB;
+	PA = P - spoint;
+	PB = P - epoint;
+
+	//PA PB それぞれの平面法線と内積
+	float dot_PA, dot_PB;
+	dot_PA = PA.Dot(nom);
+	dot_PB = PB.Dot(nom);
+
+	//誤差調整。todo:調整しなおす。
+	if (abs(dot_PA) < 0.000001) { dot_PA = 0.0; }
+	if (abs(dot_PB) < 0.000001) { dot_PB = 0.0; }
+
+	//交差を判定していく。
+	if (dot_PA == 0.0f && dot_PB == 0.0f) {
+		//両端が平面上なので交点計算不可能。
+		return false;
+	}
+	else {
+		if ((dot_PA >= 0.0f && dot_PB <= 0.0f) ||
+			(dot_PA <= 0.0f && dot_PB >= 0.0f)) 
+		{
+			//内積片方が正,片方が負なので交差している。
+			return true;
+		}
+		else {
+			//交差していない。
+			return false;
+		}
+	}
+}
+/// <summary>
+/// ナビゲーション作成ツール。
+/// </summary>
+/// <param name="argc">引数の数。</param>
+/// <param name="argv">入力ファイル。</param>
+/// <returns></returns>
+int main(int argc, char* argv[] )
+{
+	if (argc < 2) {
+		//引数が足りないのでヘルプを表示する。
+		std::cout << "ナビゲーションメッシュ生成ツール\n";
+		std::cout << "mknvm.exe tkmFilePath nvmFilePath\n";
+		std::cout << "tkmFilePath・・・ナビゲーションメッシュの生成元のtkファイル\n";
+		std::cout << "nvmFilePath・・・生成したナビゲーションメッシュのファイルパス\n";
+		return 0;
+	}
+
+	//レベル初期化。tklもロードされてる。
+	Level level;
+	level.Init(argv[1]);
+	//ナビメッシュ
+	NaviMesh naviMesh;
+
+	int eraseCount = 0;
+
+	//tklファイルの情報をもとにtkmファイルを読み込む。
+	for (int i = 1; i < level.GetTklFile().GetObjectCount(); i++) {
+		//一個目はレベルのルートボーンなので除外。
+		//オブジェクト分回す。
+		TkmFile tkmFile;
+		//ファイルパス形成。
+		char filePath[256];
+		sprintf_s(filePath, "Assets/modelData/NavSample/%s.tkm", level.GetTklFile().GetObj(i).name.get());
+		//tkmのロード。
+		//ロードすることで頂点バッファが生成される。
+		tkmFile.Load(filePath);
+
+		//メッシュの形成をしていく。
+		//メッシュを形成するのはNaviMeshを作成する床とかのみでいいはず。
+		//todo:いま強制的に１番目のオブジェクトにNavを作成するようにしてるので直す。
+		if (level.GetTklFile().GetObj(i).no == 1) {
+			tkmFile.QueryMeshParts([&](const TkmFile::SMesh& mesh) {
+				//16ビット版
+				//NavMesh作る上では,
+				BuildCellsFromOneMesh(naviMesh, mesh.indexBuffer16Array, mesh);
+				BuildCellsFromOneMesh(naviMesh, mesh.indexBuffer32Array, mesh);
+				});
+		}
+		//頂点の最大。
+		Vector3 vMax = tkmFile.GetMaxVertex();
+		//頂点の最小。
+		Vector3 vMin = tkmFile.GetMinVertex();
+		//ローカルAABBを求める。
+		AABB aabb;
+		CalcAABB(aabb, vMax, vMin);
+
+		//AABBをワールド座標系にするために、
+		//レベルから変換座標を持ってくる。
+		Vector3 levelPos = level.GetLevelObj(i).position;
+		Quaternion levelRot = level.GetLevelObj(i).rotatatin;
+		Vector3 scale = level.GetLevelObj(i).scale;	
+		//変換座標を行列化していく。
+		Matrix mTrans, mRot, mScale;
+		mTrans.MakeTranslation(levelPos);
+		mRot.MakeRotationFromQuaternion(levelRot);
+		mScale.MakeScaling(scale);
+		//ワールド行列を求める。
+		Matrix world = mScale * mRot * mTrans;
+		
+		//ここからローカルAABBにワールド行列を乗算していく。
+		for(int vCount = 0; vCount < EnRectangular_Num; vCount++) {
+			//ワールド座標軸に変換。
+			aabb.v[vCount].TransformCoord(world);
+		}
+
+		//AABBの線分１２本を求めていく。
+		//todo:このコードに救済を。
+		//手前左。
+		aabb.line[0] = { aabb.v[EnFupperLeft] ,aabb.v[EnFlowerLeft] };
+		//手前上。
+		aabb.line[1] = { aabb.v[EnFupperLeft] ,aabb.v[EnFupperRight] };
+		//奥左。
+		aabb.line[2] = { aabb.v[EnFupperLeft] ,aabb.v[EnBupperLeft] };
+		//手前下。
+		aabb.line[3] = { aabb.v[EnFlowerLeft] , aabb.v[EnFlowerRight] };
+		//手前右。
+		aabb.line[4] = { aabb.v[EnFupperRight] , aabb.v[EnFlowerRight] };
+		//奥上。
+		aabb.line[5] = { aabb.v[EnBupperLeft] , aabb.v[EnBupperRight] };
+		//奥右
+		aabb.line[6] = { aabb.v[EnFupperRight] , aabb.v[EnBupperRight] };
+		//
+		aabb.line[7] = { aabb.v[EnBupperRight] , aabb.v[EnBlowerRight] };
+		//
+		aabb.line[8] = { aabb.v[EnFlowerRight] , aabb.v[EnBlowerRight] };
+
+		aabb.line[9] = { aabb.v[EnFlowerLeft] , aabb.v[EnBlowerLeft] };
+
+		aabb.line[10] = { aabb.v[EnBlowerLeft] , aabb.v[EnBlowerRight] };
+
+		aabb.line[11] = { aabb.v[EnBupperLeft] , aabb.v[EnBlowerLeft] };
+
+		for (int cellCount = 0; cellCount < naviMesh.m_cell.size(); cellCount++) {
+			//AABBの線分とセルに対して、衝突判定を行う。
+			for (int lineCount = 0; lineCount < 12; lineCount++) {
+				//線分本数分、衝突判定を行う。
+				//todo:後でlineもenum定義してマジックナンバーけしまそ。
+				//衝突判定(collision detection)。
+				bool CD = IntersectPlaneAndLine(aabb.line[lineCount].SPoint, aabb.line[lineCount].EPoint, naviMesh.m_cell[cellCount]);
+				if (CD == true) {
+					//衝突してたから、そのセルは削除する。
+					naviMesh.m_cell.erase(naviMesh.m_cell.begin() + lineCount);
+					eraseCount++;
+				}
+			}
+		}
+	}
+
+	printf("消されたセルの数は%dです。", eraseCount);
+
+
+	//////////////////////////////////////////////////////////////////////////////
+	//①高速にするために・・・
+	//②ナビゲーションメッシュをノードとするBVH構築する。
+	//③線分と三角形との当たり判定との前に、BVHを利用した大幅な足切りを行う。
+	//////////////////////////////////////////////////////////////////////////////
+	
+
+
+	//////////////////////////////////////////////////////////////////////////////
+	//配置されているオブジェクトとセルの当たり判定を行って、
+	//衝突しているセルは除去する。
+	//①配置されているオブジェクトのローカルAABBをして8頂点を求める。
+	//②ローカルAABBの8頂点にワールド行列を乗算する。
+	//③8頂点のエッジ(線分)と三角形との衝突判定を行って、ぶつかっているセルを除去。
+	//④線分と三角形の衝突判定は、平面の方程式をなんとかしたらできます。
+	//////////////////////////////////////////////////////////////////////////////
+	
+	////navimeshをAABBして8頂点計算していく。
+	//Vector3 v[EnRectangular_Num];
+	////最大、最小頂点格納用。
+	//Vector3 vMax = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+	//Vector3 vMin = { FLT_MAX,FLT_MAX ,FLT_MAX };
+	//for (int cellCount = 0; cellCount < naviMesh.m_cell.size(); cellCount++) {
+	//	for (int vecCount = 0; vecCount < 3; vecCount++) {
+	//		//navimeshの数分 + 3辺分回す。 todo:マジックナンバー。。。
+	//		vMax.Max(naviMesh.m_cell[cellCount].pos[vecCount]);
+	//		vMin.Min(naviMesh.m_cell[cellCount].pos[vecCount]);
+	//	}
+	//}
+
+	//セルの隣接情報の構築。
+
+
+	//ナビゲーションメッシュのデータを保存。
+	FILE* fp = fopen(argv[2], "wb");
+	int i = 0;
+	fwrite(&i, sizeof(i), 1, fp);
+	fclose(fp);
+}

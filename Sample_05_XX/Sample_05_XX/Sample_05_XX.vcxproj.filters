@@ -1,0 +1,89 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="ソース ファイル">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="ヘッダー ファイル">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="MiniEngine">
+      <UniqueIdentifier>{cc7395d8-c038-48b6-8449-ccd23e842334}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MiniEngine\math">
+      <UniqueIdentifier>{537105af-f4ca-42d1-ab2d-d112e5b73c11}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MiniEngine\tkFile">
+      <UniqueIdentifier>{22cebcfb-0109-475e-8c80-6691262acbc6}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="stdafx.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\MiniEngine\math\Vector.cpp">
+      <Filter>MiniEngine\math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\MiniEngine\math\Matrix.cpp">
+      <Filter>MiniEngine\math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\MiniEngine\tkFile\TkmFile.cpp">
+      <Filter>MiniEngine\tkFile</Filter>
+    </ClCompile>
+    <ClCompile Include="level\Level.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="level\TklFile.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Resource\IResource.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Skeleton.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="TksFile.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="stdafx.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\MiniEngine\math\Vector.h">
+      <Filter>MiniEngine\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\MiniEngine\math\Math.h">
+      <Filter>MiniEngine\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\MiniEngine\math\Matrix.h">
+      <Filter>MiniEngine\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\MiniEngine\tkFile\TkmFile.h">
+      <Filter>MiniEngine\tkFile</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\MiniEngine\MiniEngine.h">
+      <Filter>MiniEngine</Filter>
+    </ClInclude>
+    <ClInclude Include="level\Level.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="level\TklFile.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Resource\IResource.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Skeleton.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="TksFile.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
