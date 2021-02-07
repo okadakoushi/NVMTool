@@ -34,8 +34,44 @@ struct Cell {
 /// <summary>
 /// ナビゲーションメッシュ。
 /// </summary>
-struct NaviMesh {
+class NaviMesh {
+public:
 	std::vector<Cell>	m_cell;
+	void Save(const char* filePath)
+	{
+		//ファイルを開く
+		FILE* fp = fopen(filePath, "wb");
+		if (fp) {
+			std::intptr_t topAddress = (std::intptr_t)(&m_cell[0]);
+			//セルの数を書き込む。
+			int numCell = m_cell.size();
+			printf("Saveするセルの数は%dです。", numCell);
+			fwrite(&numCell, sizeof(numCell), 1, fp);
+			for (auto& cell : m_cell) {
+				//頂点データを保存する。
+				fwrite(&cell.pos[0], sizeof(cell.pos[0]), 1, fp);
+				fwrite(&cell.pos[1], sizeof(cell.pos[1]), 1, fp);
+				fwrite(&cell.pos[2], sizeof(cell.pos[2]), 1, fp);
+				//隣接セルのファイル内相対アドレスを記録していく。
+				for (int i = 0; i < 3; i++) {
+					std::intptr_t address;
+					if (cell.linkCell[i]) {
+						//隣接セルがあるので、ファイル内相対アドレスを書き込む。
+						address = (std::intptr_t)(&cell.linkCell[i]);
+						address -= topAddress;
+						fwrite(&address, sizeof(address), 1, fp);
+
+					}
+					else {
+						//隣接セルがない。
+						address = UINT64_MAX;
+					}
+				}
+			}
+			fclose(fp);
+		}
+		
+	}
 };
 /// <summary>
 /// 障害物。
@@ -93,7 +129,6 @@ void BuildCellsFromOneMesh(
 
 /// <summary>
 /// AABBを計算。
-/// <para>メンバでない値を返却するため参照にしないこと。</para>
 /// </summary>
 /// <param name="aabb">AABB格納用。</param>
 /// <param name="vMax">最大頂点。</param>
@@ -130,13 +165,70 @@ bool IntersectPlaneAndLine(
 	Vector3 v0 = cell.pos[0];
 	Vector3 v1 = cell.pos[1];
 	Vector3 v2 = cell.pos[2];
-	//AB,BC。
-	Vector3 nom = v1 - v0;
-	Vector3 v1Tov2 = v2 - v1;
-	//外積を計算。
-	nom.Cross(v1Tov2);
+	//v0からv1。
+	Vector3 v0tov1 = v1 - v0;
+	//法線。
+	Vector3 nom = v2 - v1;
+	nom.Cross(v0tov1);
+	nom.Normalize();
+
+	//セルを含む無限平面と線分の交差判定。
+	//三角形のどこか一頂点から線分の終点に伸びる線分。
+	Vector3 v2ToEnd = epoint - v2;
+	//三角形のどこか一頂点から線分の始点に伸びる線分。
+	Vector3 v2ToStart = spoint - v2;
+	//法線と内積をとることで正射影ベクトルが取れる。
+	float EndDotN = v2ToEnd.Dot(nom);
+	float StartDonN= v2ToStart.Dot(nom);
+	//2つの射影ベクトルの内積を求める。
+	//交差している場合は射影ベクトルが違う方向を向いているはず。
+	float v1v2 = EndDotN * StartDonN;
+	if (v1v2 < 0.0f) {
+		//無限平面と線分が交差している。
+		//交点を求める。
+		//辺の絶対値求める。
+		float EndLen = fabsf(EndDotN);
+		float StartLen = fabsf(StartDonN);
+		//辺の割合を求める。
+		if ((StartLen + EndLen) > 0.0f) {
+			float t = EndLen / (StartLen + EndLen);
+			//交点を求める。
+			Vector3 v1v2Vec = epoint - spoint;
+			v1v2Vec *= t;
+			Vector3 hitPos = epoint + v1v2Vec;
+
+			//交点がポリゴン内にあるかどうか。
+			//各頂点から法線に向かうベクトルと、次の頂点に向かうベクトルとの外積を計算して
+			//外積結果から内積をとって正の場合は衝突している。
+			//外積の特徴としてv1.Cross(v2)とあった場合にv2がv1の時計回りの位置にあれば正の値。逆は負の値になる。
+			//P0
+			Vector3 P0toP1 = v1 - v0;
+			Vector3 P0toH = hitPos - v0;
+			//外積。
+			P0toP1.Cross(P0toH);
+			//P1
+			Vector3 P1toP2 = v2 - v1;
+			Vector3 P1toH = hitPos - v1;
+			P1toP2.Cross(P0toH);
+			//P2
+			Vector3 P2toP0 = v0 - v2;
+			Vector3 P2toH = hitPos - v2;
+			P2toP0.Cross(P0toH);
+			//内積を計算。
+			float P0toP1Dot = P0toP1.Dot(P1toP2);
+			float P0toP2Dot = P0toP1.Dot(P2toP0);
+			//衝突判定。
+			if (P0toP1Dot * P0toP2Dot > 0) {
+				//衝突してた。
+				return true;
+			}
+		}
+	}
+
+	return false;
+
 	//平面の方程式のd(法線の長さ？)も求める。
-	float d = nom.Length();
+	/*float d = nom.Length();
 	//nom.Normalize();
 
 	//平面上の点Pを求める。あってるかなぁ？
@@ -172,7 +264,7 @@ bool IntersectPlaneAndLine(
 			//交差していない。
 			return false;
 		}
-	}
+	}*/
 }
 /// <summary>
 /// ナビゲーション作成ツール。
@@ -221,6 +313,8 @@ int main(int argc, char* argv[] )
 				BuildCellsFromOneMesh(naviMesh, mesh.indexBuffer16Array, mesh);
 				BuildCellsFromOneMesh(naviMesh, mesh.indexBuffer32Array, mesh);
 				});
+			//NavMeshを作成したオブジェクトとは当たり判定を取る必要はないので処理をスキップ。
+			continue;
 		}
 		//頂点の最大。
 		Vector3 vMax = tkmFile.GetMaxVertex();
@@ -285,24 +379,20 @@ int main(int argc, char* argv[] )
 				bool CD = IntersectPlaneAndLine(aabb.line[lineCount].SPoint, aabb.line[lineCount].EPoint, naviMesh.m_cell[cellCount]);
 				if (CD == true) {
 					//衝突してたから、そのセルは削除する。
-					naviMesh.m_cell.erase(naviMesh.m_cell.begin() + lineCount);
+					naviMesh.m_cell.erase(naviMesh.m_cell.begin() + cellCount);
+					printf("セルが削除されました。セル番号は%dです。\n", cellCount);
 					eraseCount++;
 				}
 			}
 		}
 	}
-
-	printf("消されたセルの数は%dです。", eraseCount);
-
+	naviMesh.Save(argv[2]);
 
 	//////////////////////////////////////////////////////////////////////////////
 	//①高速にするために・・・
 	//②ナビゲーションメッシュをノードとするBVH構築する。
 	//③線分と三角形との当たり判定との前に、BVHを利用した大幅な足切りを行う。
 	//////////////////////////////////////////////////////////////////////////////
-	
-
-
 	//////////////////////////////////////////////////////////////////////////////
 	//配置されているオブジェクトとセルの当たり判定を行って、
 	//衝突しているセルは除去する。
@@ -311,26 +401,5 @@ int main(int argc, char* argv[] )
 	//③8頂点のエッジ(線分)と三角形との衝突判定を行って、ぶつかっているセルを除去。
 	//④線分と三角形の衝突判定は、平面の方程式をなんとかしたらできます。
 	//////////////////////////////////////////////////////////////////////////////
-	
-	////navimeshをAABBして8頂点計算していく。
-	//Vector3 v[EnRectangular_Num];
-	////最大、最小頂点格納用。
-	//Vector3 vMax = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
-	//Vector3 vMin = { FLT_MAX,FLT_MAX ,FLT_MAX };
-	//for (int cellCount = 0; cellCount < naviMesh.m_cell.size(); cellCount++) {
-	//	for (int vecCount = 0; vecCount < 3; vecCount++) {
-	//		//navimeshの数分 + 3辺分回す。 todo:マジックナンバー。。。
-	//		vMax.Max(naviMesh.m_cell[cellCount].pos[vecCount]);
-	//		vMin.Min(naviMesh.m_cell[cellCount].pos[vecCount]);
-	//	}
-	//}
 
-	//セルの隣接情報の構築。
-
-
-	//ナビゲーションメッシュのデータを保存。
-	FILE* fp = fopen(argv[2], "wb");
-	int i = 0;
-	fwrite(&i, sizeof(i), 1, fp);
-	fclose(fp);
 }
