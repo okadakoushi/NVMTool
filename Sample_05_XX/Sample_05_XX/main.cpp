@@ -97,7 +97,7 @@ struct AABB {
 		EnFrontLeft,
 		EnBuckLeft,
 		EnFrontRight,
-		EnBuckLeft,
+		EnBuckRight,
 		EnLineCount
 	};
 	Line line[EnLineCount];	//AABBを構成する線分4本。
@@ -274,13 +274,67 @@ bool IntersectPlaneAndLine(
 		}
 	}*/
 }
+
+void hantei(Vector3& vMax, Vector3& vMin, AABB& aabb, NaviMesh& naviMesh, int cellCount) 
+{
+	printf("メッシュ番号は%dです。\n", cellCount);
+	//ここから当たり判定が抜けないように、AABB内部に規則的な線分を飛ばして
+	//当たり判定を抜けないようにする。
+	//AABBの辺からとばす頂点の間隔。
+	const int stride = 5;
+	//各軸の線分を飛ばす数。
+	int xCount = vMax.x - vMin.x / stride;
+	int yCount = vMax.y - vMin.y / stride;	//こいつZ
+	int zCount = vMax.z - vMin.z / stride;	//こいつY
+
+	//基点とする頂点。
+	const Vector3 baseVertex = aabb.v[EnFlowerLeft];
+	//基盤のXYZ軸の頂点座標を求める。
+	//基盤頂点座標リスト。普通の配列でやると、サイズ確保量が決め打ちになって気持ち悪いのでvectorでやろう。
+	vector<float> Base_xValue, Base_yValue, Base_zValue;
+	////初期化しとく。
+	//Base_xValue.resize(xCount);
+	//Base_yValue.resize(xCount);
+	//Base_zValue.resize(xCount);
+	for (int vX = 0; vX < xCount; vX++) {
+		float X = baseVertex.x + vX * stride;
+		Base_xValue.push_back(X);
+	}
+	for (int vY = 0; vY < yCount; vY++) {
+		float Y = baseVertex.y + vY * stride;
+		Base_yValue.push_back(Y);
+	}
+	for (int vZ = 0; vZ < zCount; vZ++) {
+		float Z = baseVertex.z + vZ * stride;
+		Base_zValue.push_back(Z);
+	}
+	//始点と終点。
+	Vector3 Start, End;
+	End = baseVertex;
+	//全線分計算。
+	for (int y = 0; y < yCount; y++) {
+		for (int x = 0; x < xCount; x++) {
+			for (int z = 0; z < zCount; z++) {
+				//始点は前の終点。
+				Start = End;
+				End = { Base_xValue[x] * stride, Base_yValue[y] * stride , Base_zValue[z] * stride };
+				bool CD = IntersectPlaneAndLine(Start, End, naviMesh.m_cell[cellCount]);
+				if (CD == true) {
+					printf("削除おおおおおおおおおお！！\n");
+					naviMesh.m_cell.erase(naviMesh.m_cell.begin() + cellCount);
+					return;
+				}
+			}
+		}
+	}
+}
 /// <summary>
 /// ナビゲーション作成ツール。
 /// </summary>
 /// <param name="argc">引数の数。</param>
 /// <param name="argv">入力ファイル。</param>
 /// <returns></returns>
-int main(int argc, char* argv[] )
+int main(int argc, char* argv[])
 {
 	if (argc < 2) {
 		//引数が足りないのでヘルプを表示する。
@@ -336,7 +390,7 @@ int main(int argc, char* argv[] )
 		//レベルから変換座標を持ってくる。
 		Vector3 levelPos = level.GetLevelObj(i).position;
 		Quaternion levelRot = level.GetLevelObj(i).rotatatin;
-		Vector3 scale = level.GetLevelObj(i).scale;	
+		Vector3 scale = level.GetLevelObj(i).scale;
 		//変換座標を行列化していく。
 		Matrix mTrans, mRot, mScale;
 		mTrans.MakeTranslation(levelPos);
@@ -344,9 +398,9 @@ int main(int argc, char* argv[] )
 		mScale.MakeScaling(scale);
 		//ワールド行列を求める。
 		Matrix world = mScale * mRot * mTrans;
-		
+
 		//ここからローカルAABBにワールド行列を乗算していく。
-		for(int vCount = 0; vCount < EnRectangular_Num; vCount++) {
+		for (int vCount = 0; vCount < EnRectangular_Num; vCount++) {
 			//ワールド座標軸に変換。
 			aabb.v[vCount].TransformCoord(world);
 		}
@@ -378,41 +432,45 @@ int main(int argc, char* argv[] )
 
 		//aabb.line[11] = { aabb.v[EnBupperLeft] , aabb.v[EnBlowerLeft] };
 
-		aabb.line[AABB::EnFrontLeft] = { aabb.v[EnFlowerLeft], aabb.v[EnFupperLeft] };
-		aabb.line[AABB::EnFrontLeft] = { aabb.v[EnBlowerLeft], aabb.v[EnBupperLeft] };
-		aabb.line[AABB::EnFrontLeft] = { aabb.v[EnFlowerRight], aabb.v[EnFupperRight] };
-		aabb.line[AABB::EnFrontLeft] = { aabb.v[EnBlowerRight], aabb.v[EnBupperRight] };
+		//aabb.line[AABB::EnFrontLeft] = { aabb.v[EnFlowerLeft], aabb.v[EnFupperLeft] };
+		//aabb.line[AABB::EnFrontLeft] = { aabb.v[EnBlowerLeft], aabb.v[EnBupperLeft] };
+		//aabb.line[AABB::EnFrontLeft] = { aabb.v[EnFlowerRight], aabb.v[EnFupperRight] };
+		//aabb.line[AABB::EnFrontLeft] = { aabb.v[EnBlowerRight], aabb.v[EnBupperRight] };
 
-		for (int cellCount = 0; cellCount < naviMesh.m_cell.size(); cellCount++) {
-			//AABBの線分とセルに対して、衝突判定を行う。
-			for (int lineCount = 0; lineCount < AABB::EnLineCount; lineCount++) {
-				//線分本数分、衝突判定を行う。
-				//todo:後でlineもenum定義してマジックナンバーけしまそ。
-				//衝突判定(collision detection)。
-				bool CD = IntersectPlaneAndLine(aabb.line[lineCount].SPoint, aabb.line[lineCount].EPoint, naviMesh.m_cell[cellCount]);
-				if (CD == true) {
-					//衝突してたから、そのセルは削除する。
-					naviMesh.m_cell.erase(naviMesh.m_cell.begin() + cellCount);
-					printf("セルが削除されました。セル番号は%dです。\n", cellCount);
-					eraseCount++;
-				}
-			}
+		for (int cellCount = naviMesh.m_cell.size(); cellCount > 0; cellCount--) {
+			hantei(vMax, vMin, aabb, naviMesh, cellCount);
 		}
+
+	//	for (int cellCount = 0; cellCount < naviMesh.m_cell.size(); cellCount++) {
+	//		//セルの数分ループ。
+	//		for (int lineCount = 0; lineCount < AABB::EnLineCount; lineCount++) {
+	//			//線分本数分、衝突判定を行う。
+	//			//衝突判定(collision detection)。
+	//			bool CD = IntersectPlaneAndLine(aabb.line[lineCount].SPoint, aabb.line[lineCount].EPoint, naviMesh.m_cell[cellCount]);
+	//			if (CD == true) {
+	//				//衝突してたから、そのセルは削除する。
+	//				naviMesh.m_cell.erase(naviMesh.m_cell.begin() + cellCount);
+	//				printf("セルが削除されました。セル番号は%dです。\n", cellCount);
+	//				eraseCount++;
+	//			}
+	//		}
+	//	}
+	//}
+
+		//////////////////////////////////////////////////////////////////////////////
+		//①高速にするために・・・
+		//②ナビゲーションメッシュをノードとするBVH構築する。
+		//③線分と三角形との当たり判定との前に、BVHを利用した大幅な足切りを行う。
+		//////////////////////////////////////////////////////////////////////////////
+		//////////////////////////////////////////////////////////////////////////////
+		//配置されているオブジェクトとセルの当たり判定を行って、
+		//衝突しているセルは除去する。
+		//①配置されているオブジェクトのローカルAABBをして8頂点を求める。
+		//②ローカルAABBの8頂点にワールド行列を乗算する。
+		//③8頂点のエッジ(線分)と三角形との衝突判定を行って、ぶつかっているセルを除去。
+		//④線分と三角形の衝突判定は、平面の方程式をなんとかしたらできます。
+		//////////////////////////////////////////////////////////////////////////////
+
 	}
 	naviMesh.Save(argv[2]);
-
-	//////////////////////////////////////////////////////////////////////////////
-	//①高速にするために・・・
-	//②ナビゲーションメッシュをノードとするBVH構築する。
-	//③線分と三角形との当たり判定との前に、BVHを利用した大幅な足切りを行う。
-	//////////////////////////////////////////////////////////////////////////////
-	//////////////////////////////////////////////////////////////////////////////
-	//配置されているオブジェクトとセルの当たり判定を行って、
-	//衝突しているセルは除去する。
-	//①配置されているオブジェクトのローカルAABBをして8頂点を求める。
-	//②ローカルAABBの8頂点にワールド行列を乗算する。
-	//③8頂点のエッジ(線分)と三角形との衝突判定を行って、ぶつかっているセルを除去。
-	//④線分と三角形の衝突判定は、平面の方程式をなんとかしたらできます。
-	//////////////////////////////////////////////////////////////////////////////
-
 }
