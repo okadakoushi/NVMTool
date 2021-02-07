@@ -92,7 +92,15 @@ struct Line {
 /// </summary>
 struct AABB {
 	Vector3 v[8];	//AABBを構成する８点。
-	Line line[12];	//AABBを構成する線分１２本。
+	//線分の名前。
+	enum LineName {
+		EnFrontLeft,
+		EnBuckLeft,
+		EnFrontRight,
+		EnBuckLeft,
+		EnLineCount
+	};
+	Line line[EnLineCount];	//AABBを構成する線分4本。
 };
 
 /// <summary>
@@ -166,10 +174,10 @@ bool IntersectPlaneAndLine(
 	Vector3 v1 = cell.pos[1];
 	Vector3 v2 = cell.pos[2];
 	//v0からv1。
-	Vector3 v0tov1 = v1 - v0;
+	Vector3 nom = v1 - v0;
 	//法線。
-	Vector3 nom = v2 - v1;
-	nom.Cross(v0tov1);
+	Vector3 v2tov1 = v2 - v1;
+	nom.Cross(v2tov1);
 	nom.Normalize();
 
 	//セルを含む無限平面と線分の交差判定。
@@ -346,33 +354,38 @@ int main(int argc, char* argv[] )
 		//AABBの線分１２本を求めていく。
 		//todo:このコードに救済を。
 		//手前左。
-		aabb.line[0] = { aabb.v[EnFupperLeft] ,aabb.v[EnFlowerLeft] };
-		//手前上。
-		aabb.line[1] = { aabb.v[EnFupperLeft] ,aabb.v[EnFupperRight] };
-		//奥左。
-		aabb.line[2] = { aabb.v[EnFupperLeft] ,aabb.v[EnBupperLeft] };
-		//手前下。
-		aabb.line[3] = { aabb.v[EnFlowerLeft] , aabb.v[EnFlowerRight] };
-		//手前右。
-		aabb.line[4] = { aabb.v[EnFupperRight] , aabb.v[EnFlowerRight] };
-		//奥上。
-		aabb.line[5] = { aabb.v[EnBupperLeft] , aabb.v[EnBupperRight] };
-		//奥右
-		aabb.line[6] = { aabb.v[EnFupperRight] , aabb.v[EnBupperRight] };
-		//
-		aabb.line[7] = { aabb.v[EnBupperRight] , aabb.v[EnBlowerRight] };
-		//
-		aabb.line[8] = { aabb.v[EnFlowerRight] , aabb.v[EnBlowerRight] };
+		//aabb.line[0] = { aabb.v[EnFupperLeft] ,aabb.v[EnFlowerLeft] };
+		////手前上。
+		//aabb.line[1] = { aabb.v[EnFupperLeft] ,aabb.v[EnFupperRight] };
+		////奥左。
+		//aabb.line[2] = { aabb.v[EnFupperLeft] ,aabb.v[EnBupperLeft] };
+		////手前下。
+		//aabb.line[3] = { aabb.v[EnFlowerLeft] , aabb.v[EnFlowerRight] };
+		////手前右。
+		//aabb.line[4] = { aabb.v[EnFupperRight] , aabb.v[EnFlowerRight] };
+		////奥上。
+		//aabb.line[5] = { aabb.v[EnBupperLeft] , aabb.v[EnBupperRight] };
+		////奥右
+		//aabb.line[6] = { aabb.v[EnFupperRight] , aabb.v[EnBupperRight] };
+		////
+		//aabb.line[7] = { aabb.v[EnBupperRight] , aabb.v[EnBlowerRight] };
+		////
+		//aabb.line[8] = { aabb.v[EnFlowerRight] , aabb.v[EnBlowerRight] };
 
-		aabb.line[9] = { aabb.v[EnFlowerLeft] , aabb.v[EnBlowerLeft] };
+		//aabb.line[9] = { aabb.v[EnFlowerLeft] , aabb.v[EnBlowerLeft] };
 
-		aabb.line[10] = { aabb.v[EnBlowerLeft] , aabb.v[EnBlowerRight] };
+		//aabb.line[10] = { aabb.v[EnBlowerLeft] , aabb.v[EnBlowerRight] };
 
-		aabb.line[11] = { aabb.v[EnBupperLeft] , aabb.v[EnBlowerLeft] };
+		//aabb.line[11] = { aabb.v[EnBupperLeft] , aabb.v[EnBlowerLeft] };
+
+		aabb.line[AABB::EnFrontLeft] = { aabb.v[EnFlowerLeft], aabb.v[EnFupperLeft] };
+		aabb.line[AABB::EnFrontLeft] = { aabb.v[EnBlowerLeft], aabb.v[EnBupperLeft] };
+		aabb.line[AABB::EnFrontLeft] = { aabb.v[EnFlowerRight], aabb.v[EnFupperRight] };
+		aabb.line[AABB::EnFrontLeft] = { aabb.v[EnBlowerRight], aabb.v[EnBupperRight] };
 
 		for (int cellCount = 0; cellCount < naviMesh.m_cell.size(); cellCount++) {
 			//AABBの線分とセルに対して、衝突判定を行う。
-			for (int lineCount = 0; lineCount < 12; lineCount++) {
+			for (int lineCount = 0; lineCount < AABB::EnLineCount; lineCount++) {
 				//線分本数分、衝突判定を行う。
 				//todo:後でlineもenum定義してマジックナンバーけしまそ。
 				//衝突判定(collision detection)。
