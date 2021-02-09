@@ -137,21 +137,9 @@ void Level::BuildBoneMatrices()
 			tklObj.no
 			);
 		//ボーン名判別。
-		auto it = std::find_if(m_bones.begin(), m_bones.end(), [&](auto& bone) {return wcscmp(boneName, bone->GetName()) == 0; });
-		if (it != m_bones.end()) {
-			//同名のボーンを発見。
-			//ボーンの同名定義エラーはここでいちいち直して。。。todo:ボーンまでエラー表示。
-			//_bstr_t b(boneName);
-			//const char* c = b;
-			MessageBox(
-				nullptr,
-				L"Level::BuildBoneMatrices();同名のボーンが見つかりました。",
-				L"エラー。",
-				MB_OK
-			);
-		}
-		//ボーンを積む。
-		m_bones.push_back(std::move(bone));
+		
+			//ボーンを積む。
+			m_bones.push_back(std::move(bone));
 		});
 	
 	for (auto& bone : m_bones) {

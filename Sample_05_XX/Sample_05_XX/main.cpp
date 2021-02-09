@@ -29,7 +29,8 @@ enum Rectangular {
 /// </summary>
 struct Cell {
 	Vector3 pos[3];
-	Cell* linkCell[3];
+	Cell* linkCell[3] = { nullptr };
+	
 };
 /// <summary>
 /// ナビゲーションメッシュ。
@@ -65,6 +66,7 @@ public:
 					else {
 						//隣接セルがない。
 						address = UINT64_MAX;
+						fwrite(&address, sizeof(address), 1, fp);
 					}
 				}
 			}
@@ -131,6 +133,9 @@ void BuildCellsFromOneMesh(
 			c.pos[1] = mesh.vertexBuffer[vertNo_1].pos;
 			c.pos[2] = mesh.vertexBuffer[vertNo_2].pos;
 			naviMesh.m_cell.push_back(c);
+			//printf("naviMesh作成。作成したセル番号は%d、位置は(%f, %f, %f)です。\n", (unsigned int)naviMesh.m_cell.size(), c.pos[0].x, c.pos[0].y, c.pos[0].z);
+			//printf("naviMesh作成。作成したセル番号は%d、位置は(%f, %f, %f)です。\n", (unsigned int)naviMesh.m_cell.size(), c.pos[1].x, c.pos[1].y, c.pos[1].z);
+			//printf("naviMesh作成。作成したセル番号は%d、位置は(%f, %f, %f)です。\n", (unsigned int)naviMesh.m_cell.size(), c.pos[2].x, c.pos[2].y, c.pos[2].z);
 		}
 	}
 }
@@ -170,9 +175,15 @@ bool IntersectPlaneAndLine(
 )
 {
 	//セルの法線を求めていく。
+#if 0	 //テスト
+	Vector3 v0 = { 0.0f, 0.0f, 0.0f };
+	Vector3 v1 = { 20.0f, 0.0f, 0.0f };
+	Vector3 v2 = { 0.0f, 20.0f, 0.0f };
+#else
 	Vector3 v0 = cell.pos[0];
 	Vector3 v1 = cell.pos[1];
 	Vector3 v2 = cell.pos[2];
+#endif
 	//v0からv1。
 	Vector3 nom = v1 - v0;
 	//法線。
@@ -201,7 +212,7 @@ bool IntersectPlaneAndLine(
 		if ((StartLen + EndLen) > 0.0f) {
 			float t = EndLen / (StartLen + EndLen);
 			//交点を求める。
-			Vector3 v1v2Vec = epoint - spoint;
+			Vector3 v1v2Vec = spoint - epoint;
 			v1v2Vec *= t;
 			Vector3 hitPos = epoint + v1v2Vec;
 
@@ -214,19 +225,21 @@ bool IntersectPlaneAndLine(
 			Vector3 P0toH = hitPos - v0;
 			//外積。
 			P0toP1.Cross(P0toH);
+			P0toP1.Normalize();
 			//P1
 			Vector3 P1toP2 = v2 - v1;
 			Vector3 P1toH = hitPos - v1;
-			P1toP2.Cross(P0toH);
+			P1toP2.Cross(P1toH);
+			P1toP2.Normalize();
 			//P2
 			Vector3 P2toP0 = v0 - v2;
 			Vector3 P2toH = hitPos - v2;
-			P2toP0.Cross(P0toH);
-			//内積を計算。
+			P2toP0.Cross(P2toH);
+			P2toP0.Normalize();			//内積を計算。
 			float P0toP1Dot = P0toP1.Dot(P1toP2);
 			float P0toP2Dot = P0toP1.Dot(P2toP0);
 			//衝突判定。
-			if (P0toP1Dot * P0toP2Dot > 0) {
+			if (P0toP1Dot > 0 && P0toP2Dot > 0) {
 				//衝突してた。
 				return true;
 			}
@@ -275,27 +288,32 @@ bool IntersectPlaneAndLine(
 	}*/
 }
 
+/// <summary>
+/// 線分とセルの当たり判定。
+/// <para>一線でも当たっていた場合、該当セルを削除してreturn。</para>
+/// </summary>
+/// <param name="vMax">AABBの最大頂点。</param>
+/// <param name="vMin">AABBの最小頂点。</param>
+/// <param name="aabb">AABB。</param>
+/// <param name="naviMesh">ナビメッシュ。</param>
+/// <param name="cellCount">セル番号。</param>
 void hantei(Vector3& vMax, Vector3& vMin, AABB& aabb, NaviMesh& naviMesh, int cellCount) 
 {
-	printf("メッシュ番号は%dです。\n", cellCount);
+	//printf("メッシュ番号は%dです。\n", cellCount);
 	//ここから当たり判定が抜けないように、AABB内部に規則的な線分を飛ばして
 	//当たり判定を抜けないようにする。
 	//AABBの辺からとばす頂点の間隔。
 	const int stride = 5;
 	//各軸の線分を飛ばす数。
-	int xCount = vMax.x - vMin.x / stride;
-	int yCount = vMax.y - vMin.y / stride;	//こいつZ
-	int zCount = vMax.z - vMin.z / stride;	//こいつY
+	int xCount = (vMax.x - vMin.x) / stride;
+	int yCount = (vMax.y - vMin.y) / stride;	//こいつZ
 
 	//基点とする頂点。
-	const Vector3 baseVertex = aabb.v[EnFlowerLeft];
-	//基盤のXYZ軸の頂点座標を求める。
-	//基盤頂点座標リスト。普通の配列でやると、サイズ確保量が決め打ちになって気持ち悪いのでvectorでやろう。
-	vector<float> Base_xValue, Base_yValue, Base_zValue;
-	////初期化しとく。
-	//Base_xValue.resize(xCount);
-	//Base_yValue.resize(xCount);
-	//Base_zValue.resize(xCount);
+	const Vector3 baseVertex = aabb.v[EnFupperLeft];
+
+	////基盤のXYZ軸の頂点座標を求める。
+	////基盤頂点座標リスト。普通の配列でやると、サイズ確保量が決め打ちになって気持ち悪いのでvectorでやろう。
+	vector<float> Base_xValue, Base_yValue;
 	for (int vX = 0; vX < xCount; vX++) {
 		float X = baseVertex.x + vX * stride;
 		Base_xValue.push_back(X);
@@ -304,29 +322,62 @@ void hantei(Vector3& vMax, Vector3& vMin, AABB& aabb, NaviMesh& naviMesh, int ce
 		float Y = baseVertex.y + vY * stride;
 		Base_yValue.push_back(Y);
 	}
-	for (int vZ = 0; vZ < zCount; vZ++) {
-		float Z = baseVertex.z + vZ * stride;
-		Base_zValue.push_back(Z);
-	}
-	//始点と終点。
+
+	
 	Vector3 Start, End;
-	End = baseVertex;
-	//全線分計算。
-	for (int y = 0; y < yCount; y++) {
-		for (int x = 0; x < xCount; x++) {
-			for (int z = 0; z < zCount; z++) {
-				//始点は前の終点。
-				Start = End;
-				End = { Base_xValue[x] * stride, Base_yValue[y] * stride , Base_zValue[z] * stride };
-				bool CD = IntersectPlaneAndLine(Start, End, naviMesh.m_cell[cellCount]);
-				if (CD == true) {
-					printf("削除おおおおおおおおおお！！\n");
-					naviMesh.m_cell.erase(naviMesh.m_cell.begin() + cellCount);
-					return;
-				}
+
+#if 0 //テスト
+	Start.x = 10.0f;
+	Start.y = 5.0f;
+	Start.z = 1000.0f;
+	End.x = 10.0f;
+	End.y = 0.0f;
+	End.z = -1000.0f;
+	bool CD = IntersectPlaneAndLine(Start, End, naviMesh.m_cell[cellCount]);
+	if (CD == true) {
+		//printf("削除おおおおおおおおおお！！\n");
+		//IntersectPlaneAndLine(Start, End, naviMesh.m_cell[cellCount]);
+		naviMesh.m_cell.erase(naviMesh.m_cell.begin() + cellCount);
+		return;
+	}
+#else
+	for (int x = 0; x < xCount; x++) {
+		for (int y = 0; y < yCount; y++) {
+			//XY平面にある点(始点)から真下に線分を飛ばす。
+			Start = { Base_xValue[x], Base_yValue[y], baseVertex.z };
+			End = { Base_xValue[x], Base_yValue[y], baseVertex.z - 500 };
+			bool CD = IntersectPlaneAndLine(Start, End, naviMesh.m_cell[cellCount]);
+			if (CD == true) {
+				//printf("削除おおおおおおおおおお！！\n");
+				naviMesh.m_cell.erase(naviMesh.m_cell.begin() + cellCount);
+				return;
 			}
 		}
 	}
+#endif
+	////始点と終点。
+	//Vector3 Start, End;
+	//End = baseVertex;
+	////全線分計算。
+	//for (int y = 0; y < yCount; y++) {
+	//	for (int x = 0; x < xCount; x++) {
+	//		//始点は前の終点。
+	//		Start = End;
+	//		End = { Base_xValue[x], Base_yValue[y], 0 };
+	//		if (y + x == 0) {
+	//			//問題ない気がするけど、最初の頂点なのではじいとく。
+	//			continue;
+	//		}
+	//		bool CD = IntersectPlaneAndLine(Start, End, naviMesh.m_cell[cellCount]);
+	//		if (CD == true) {
+	//			printf("削除おおおおおおおおおお！！\n");
+	//			//衝突していたので、セルを削除して次のセルに進む。
+	//			naviMesh.m_cell.erase(naviMesh.m_cell.begin() + cellCount);
+	//			//ループ終了。次のセルへ。
+	//			return;
+	//		}
+	//	}
+	//}
 }
 /// <summary>
 /// ナビゲーション作成ツール。
@@ -352,9 +403,10 @@ int main(int argc, char* argv[])
 	NaviMesh naviMesh;
 
 	int eraseCount = 0;
-
+	int numMaxObject = level.GetTklFile().GetObjectCount();
 	//tklファイルの情報をもとにtkmファイルを読み込む。
 	for (int i = 1; i < level.GetTklFile().GetObjectCount(); i++) {
+		printf("endObjNo = %d/%d\n", i, numMaxObject);
 		//一個目はレベルのルートボーンなので除外。
 		//オブジェクト分回す。
 		TkmFile tkmFile;
@@ -437,7 +489,7 @@ int main(int argc, char* argv[])
 		//aabb.line[AABB::EnFrontLeft] = { aabb.v[EnFlowerRight], aabb.v[EnFupperRight] };
 		//aabb.line[AABB::EnFrontLeft] = { aabb.v[EnBlowerRight], aabb.v[EnBupperRight] };
 
-		for (int cellCount = naviMesh.m_cell.size(); cellCount > 0; cellCount--) {
+		for (int cellCount = naviMesh.m_cell.size() - 1; cellCount > 0; cellCount--) {
 			hantei(vMax, vMin, aabb, naviMesh, cellCount);
 		}
 
@@ -470,7 +522,7 @@ int main(int argc, char* argv[])
 		//③8頂点のエッジ(線分)と三角形との衝突判定を行って、ぶつかっているセルを除去。
 		//④線分と三角形の衝突判定は、平面の方程式をなんとかしたらできます。
 		//////////////////////////////////////////////////////////////////////////////
-
+		
 	}
 	naviMesh.Save(argv[2]);
 }

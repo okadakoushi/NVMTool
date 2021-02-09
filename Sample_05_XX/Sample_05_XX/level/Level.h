@@ -22,7 +22,7 @@ struct LevelObjectData {
 	Vector3 position;		//座標。
 	Quaternion rotatatin;	//回転。
 	Vector3 scale;			//拡大。
-	const wchar_t* name;	//名前。
+	const wchar_t* name = nullptr;	//名前。
 	bool isShadowCaster;	//シャドウキャスター。
 	bool isShadowReceiver;	//シャドウレシーバー。
 	/// <summary>
