@@ -394,6 +394,9 @@ int main(int argc, char* argv[])
 			//ワールド座標軸に変換。
 			aabb.v[vCount].TransformCoord(world);
 		}
+		//最大頂点もワールド行列に変換する。
+		vMin.TransformCoord(world);
+		vMax.TransformCoord(world);
 		//ここから衝突判定。
 		//meshすべてのセルとAABBとの当たり判定を取って、
 		//セルとAABBが衝突していたら、該当セルを削除。リストは降順から回さないと削除したときにおかしくなるはず。
