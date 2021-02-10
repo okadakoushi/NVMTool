@@ -247,45 +247,6 @@ bool IntersectPlaneAndLine(
 	}
 
 	return false;
-
-	//平面の方程式のd(法線の長さ？)も求める。
-	/*float d = nom.Length();
-	//nom.Normalize();
-
-	//平面上の点Pを求める。あってるかなぁ？
-	Vector3 P = { nom.x * d, nom.y * d, nom.z * d };
-
-	//PA,PBを求めていく。
-	Vector3 PA, PB;
-	PA = P - spoint;
-	PB = P - epoint;
-
-	//PA PB それぞれの平面法線と内積
-	float dot_PA, dot_PB;
-	dot_PA = PA.Dot(nom);
-	dot_PB = PB.Dot(nom);
-
-	//誤差調整。todo:調整しなおす。
-	if (abs(dot_PA) < 0.000001) { dot_PA = 0.0; }
-	if (abs(dot_PB) < 0.000001) { dot_PB = 0.0; }
-
-	//交差を判定していく。
-	if (dot_PA == 0.0f && dot_PB == 0.0f) {
-		//両端が平面上なので交点計算不可能。
-		return false;
-	}
-	else {
-		if ((dot_PA >= 0.0f && dot_PB <= 0.0f) ||
-			(dot_PA <= 0.0f && dot_PB >= 0.0f)) 
-		{
-			//内積片方が正,片方が負なので交差している。
-			return true;
-		}
-		else {
-			//交差していない。
-			return false;
-		}
-	}*/
 }
 
 /// <summary>
@@ -355,29 +316,6 @@ void hantei(Vector3& vMax, Vector3& vMin, AABB& aabb, NaviMesh& naviMesh, int ce
 		}
 	}
 #endif
-	////始点と終点。
-	//Vector3 Start, End;
-	//End = baseVertex;
-	////全線分計算。
-	//for (int y = 0; y < yCount; y++) {
-	//	for (int x = 0; x < xCount; x++) {
-	//		//始点は前の終点。
-	//		Start = End;
-	//		End = { Base_xValue[x], Base_yValue[y], 0 };
-	//		if (y + x == 0) {
-	//			//問題ない気がするけど、最初の頂点なのではじいとく。
-	//			continue;
-	//		}
-	//		bool CD = IntersectPlaneAndLine(Start, End, naviMesh.m_cell[cellCount]);
-	//		if (CD == true) {
-	//			printf("削除おおおおおおおおおお！！\n");
-	//			//衝突していたので、セルを削除して次のセルに進む。
-	//			naviMesh.m_cell.erase(naviMesh.m_cell.begin() + cellCount);
-	//			//ループ終了。次のセルへ。
-	//			return;
-	//		}
-	//	}
-	//}
 }
 /// <summary>
 /// ナビゲーション作成ツール。
@@ -456,73 +394,49 @@ int main(int argc, char* argv[])
 			//ワールド座標軸に変換。
 			aabb.v[vCount].TransformCoord(world);
 		}
-
-		//AABBの線分１２本を求めていく。
-		//todo:このコードに救済を。
-		//手前左。
-		//aabb.line[0] = { aabb.v[EnFupperLeft] ,aabb.v[EnFlowerLeft] };
-		////手前上。
-		//aabb.line[1] = { aabb.v[EnFupperLeft] ,aabb.v[EnFupperRight] };
-		////奥左。
-		//aabb.line[2] = { aabb.v[EnFupperLeft] ,aabb.v[EnBupperLeft] };
-		////手前下。
-		//aabb.line[3] = { aabb.v[EnFlowerLeft] , aabb.v[EnFlowerRight] };
-		////手前右。
-		//aabb.line[4] = { aabb.v[EnFupperRight] , aabb.v[EnFlowerRight] };
-		////奥上。
-		//aabb.line[5] = { aabb.v[EnBupperLeft] , aabb.v[EnBupperRight] };
-		////奥右
-		//aabb.line[6] = { aabb.v[EnFupperRight] , aabb.v[EnBupperRight] };
-		////
-		//aabb.line[7] = { aabb.v[EnBupperRight] , aabb.v[EnBlowerRight] };
-		////
-		//aabb.line[8] = { aabb.v[EnFlowerRight] , aabb.v[EnBlowerRight] };
-
-		//aabb.line[9] = { aabb.v[EnFlowerLeft] , aabb.v[EnBlowerLeft] };
-
-		//aabb.line[10] = { aabb.v[EnBlowerLeft] , aabb.v[EnBlowerRight] };
-
-		//aabb.line[11] = { aabb.v[EnBupperLeft] , aabb.v[EnBlowerLeft] };
-
-		//aabb.line[AABB::EnFrontLeft] = { aabb.v[EnFlowerLeft], aabb.v[EnFupperLeft] };
-		//aabb.line[AABB::EnFrontLeft] = { aabb.v[EnBlowerLeft], aabb.v[EnBupperLeft] };
-		//aabb.line[AABB::EnFrontLeft] = { aabb.v[EnFlowerRight], aabb.v[EnFupperRight] };
-		//aabb.line[AABB::EnFrontLeft] = { aabb.v[EnBlowerRight], aabb.v[EnBupperRight] };
-
-		for (int cellCount = naviMesh.m_cell.size() - 1; cellCount > 0; cellCount--) {
+		//ここから衝突判定。
+		//meshすべてのセルとAABBとの当たり判定を取って、
+		//セルとAABBが衝突していたら、該当セルを削除。リストは降順から回さないと削除したときにおかしくなるはず。
+		for (int cellCount = naviMesh.m_cell.size() - 1; cellCount >= 0; cellCount--) {
 			hantei(vMax, vMin, aabb, naviMesh, cellCount);
 		}
+	}
 
-	//	for (int cellCount = 0; cellCount < naviMesh.m_cell.size(); cellCount++) {
-	//		//セルの数分ループ。
-	//		for (int lineCount = 0; lineCount < AABB::EnLineCount; lineCount++) {
-	//			//線分本数分、衝突判定を行う。
-	//			//衝突判定(collision detection)。
-	//			bool CD = IntersectPlaneAndLine(aabb.line[lineCount].SPoint, aabb.line[lineCount].EPoint, naviMesh.m_cell[cellCount]);
-	//			if (CD == true) {
-	//				//衝突してたから、そのセルは削除する。
-	//				naviMesh.m_cell.erase(naviMesh.m_cell.begin() + cellCount);
-	//				printf("セルが削除されました。セル番号は%dです。\n", cellCount);
-	//				eraseCount++;
-	//			}
-	//		}
-	//	}
-	//}
+	//ここからセル1つ1つの隣接セルを求める。
+	for (int serchCell = naviMesh.m_cell.size() - 1; serchCell >= 0; serchCell--) {
+		//隣接セル番号。
+		int linkNum = 0;
+		for (int isSerchedCell = naviMesh.m_cell.size() - 1; isSerchedCell >= 0; isSerchedCell--) {
+			if (serchCell == isSerchedCell) {
+				//同じセルの場合はスキップ。
+				continue;
+			}
+			//同じ頂点の発見数。
+			int findSameVertex = 0;
+			//セルを構成する3頂点のうち、2頂点が一緒ならばそれは隣接セル。
+			for (int posCount = 0; posCount < 3; posCount++) {
+				//3頂点分
+				if (naviMesh.m_cell[serchCell].pos[0] == naviMesh.m_cell[isSerchedCell].pos[posCount]) {
+					//同じ頂点！！
+					findSameVertex++;
+				}
+				if (naviMesh.m_cell[serchCell].pos[1] == naviMesh.m_cell[isSerchedCell].pos[posCount]) {
+					//同じ頂点！！
+					findSameVertex++;
+				}
+				if (naviMesh.m_cell[serchCell].pos[2] == naviMesh.m_cell[isSerchedCell].pos[posCount]) {
+					//同じ頂点！！
+					findSameVertex++;
+				}
+			}
 
-		//////////////////////////////////////////////////////////////////////////////
-		//①高速にするために・・・
-		//②ナビゲーションメッシュをノードとするBVH構築する。
-		//③線分と三角形との当たり判定との前に、BVHを利用した大幅な足切りを行う。
-		//////////////////////////////////////////////////////////////////////////////
-		//////////////////////////////////////////////////////////////////////////////
-		//配置されているオブジェクトとセルの当たり判定を行って、
-		//衝突しているセルは除去する。
-		//①配置されているオブジェクトのローカルAABBをして8頂点を求める。
-		//②ローカルAABBの8頂点にワールド行列を乗算する。
-		//③8頂点のエッジ(線分)と三角形との衝突判定を行って、ぶつかっているセルを除去。
-		//④線分と三角形の衝突判定は、平面の方程式をなんとかしたらできます。
-		//////////////////////////////////////////////////////////////////////////////
-		
+			if (findSameVertex == 2) {
+				//同じ頂点が2つ見つかったので、こいつは隣接セル。
+				naviMesh.m_cell[serchCell].linkCell[linkNum] = &naviMesh.m_cell[isSerchedCell];
+				//リンクセル番号を次のやつにしとく。
+				linkNum++;
+			}
+		}
 	}
 	naviMesh.Save(argv[2]);
 }

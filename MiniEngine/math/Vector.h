@@ -424,6 +424,21 @@ public:
 		Div(s);
 		return *this;
 	}
+	/// <summary>
+	/// 比較演算子。
+	/// </summary>
+	/// <remarks>
+	/// ベクトルクラスに下記のような比較演算子の機能を提供します。
+	/// Vector3 v1 = g_vec3Zero;
+	/// Vector3 v2 = g_vec3Zero;
+	/// bool ret = v1 == v2;
+	/// </remarks>
+	/// <param name="vec">比較する演算子。</param>
+	/// <returns>true/false。</returns>
+	bool operator== (const Vector3& vec) const
+	{
+		return (this->x == vec.x && this->y == vec.y && this->z == vec.z);
+	}
 };
 /// <summary>
 /// 4次元ベクトルクラス。
@@ -625,22 +640,6 @@ public:
 	{
 		DirectX::XMVECTOR xmv = DirectX::XMLoadFloat4(&vec);
 		return DirectX::XMVector4LengthSq(xmv).m128_f32[0];
-	}
-	/// <summary>
-	/// ベクトルをスカラーで拡大。
-	/// </summary>
-	/// <remarks>
-	/// 下記のような処理が行われています。
-	/// this->x *= s;
-	/// this->y *= s;
-	/// this->z *= s;
-	/// this->w *= s;
-	/// </remarks>
-	void Scale(float s)
-	{
-		DirectX::XMVECTOR xmv = DirectX::XMLoadFloat4(&vec);
-		xmv = DirectX::XMVectorScale(xmv, s);
-		DirectX::XMStoreFloat4(&vec, xmv);
 	}
 };
 
