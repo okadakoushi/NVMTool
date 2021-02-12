@@ -28,8 +28,9 @@ enum Rectangular {
 /// セル。
 /// </summary>
 struct Cell {
-	Vector3 pos[3];
-	Cell* linkCell[3] = { nullptr };
+	Vector3 pos[3];						//36byte
+	std::int32_t pad;					//4byte
+	Cell* linkCell[3] = { nullptr };	//24byte
 };
 /// <summary>
 /// ナビゲーションメッシュ。
@@ -52,15 +53,16 @@ public:
 				fwrite(&cell.pos[0], sizeof(cell.pos[0]), 1, fp);
 				fwrite(&cell.pos[1], sizeof(cell.pos[1]), 1, fp);
 				fwrite(&cell.pos[2], sizeof(cell.pos[2]), 1, fp);
+				fwrite(&cell.pad, sizeof(cell.pad), 1, fp);
+
 				//隣接セルのファイル内相対アドレスを記録していく。
 				for (int i = 0; i < 3; i++) {
 					std::intptr_t address;
 					if (cell.linkCell[i]) {
 						//隣接セルがあるので、ファイル内相対アドレスを書き込む。
-						address = (std::intptr_t)(&cell.linkCell[i]);
+						address = (std::intptr_t)(cell.linkCell[i]);
 						address -= topAddress;
 						fwrite(&address, sizeof(address), 1, fp);
-
 					}
 					else {
 						//隣接セルがない。
@@ -68,6 +70,7 @@ public:
 						fwrite(&address, sizeof(address), 1, fp);
 					}
 				}
+			
 			}
 			fclose(fp);
 		}
@@ -405,6 +408,7 @@ int main(int argc, char* argv[])
 	}
 
 	//ここからセル1つ1つの隣接セルを求める。
+	printf("隣接セル情報の調査を開始。\n");
 	for (int serchCell = naviMesh.m_cell.size() - 1; serchCell >= 0; serchCell--) {
 		//隣接セル番号。
 		int linkNum = 0;
