@@ -30,7 +30,6 @@ enum Rectangular {
 struct Cell {
 	Vector3 pos[3];
 	Cell* linkCell[3] = { nullptr };
-	
 };
 /// <summary>
 /// ナビゲーションメッシュ。
