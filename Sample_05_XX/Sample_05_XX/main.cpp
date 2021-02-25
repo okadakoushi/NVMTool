@@ -28,6 +28,7 @@ enum Rectangular {
 /// セル。
 /// </summary>
 struct Cell {
+	int linkCellNumber[3] = { INT_MAX, INT_MAX, INT_MAX };		//隣接セルの番号。
 	Vector3 pos[3];						//36byte
 	std::int32_t pad;					//4byte
 	Cell* linkCell[3] = { nullptr };	//24byte
@@ -49,6 +50,10 @@ public:
 			printf("Saveするセルの数は%dです。", numCell);
 			fwrite(&numCell, sizeof(numCell), 1, fp);
 			for (auto& cell : m_cell) {
+				for (int i = 0; i < 3; i++) {
+					//セル番号も書き出し。
+					fwrite(&cell.linkCellNumber[i], sizeof(cell.linkCellNumber[i]), 1, fp);
+				}
 				//頂点データを保存する。
 				fwrite(&cell.pos[0], sizeof(cell.pos[0]), 1, fp);
 				fwrite(&cell.pos[1], sizeof(cell.pos[1]), 1, fp);
@@ -70,7 +75,6 @@ public:
 						fwrite(&address, sizeof(address), 1, fp);
 					}
 				}
-			
 			}
 			fclose(fp);
 		}
@@ -308,7 +312,7 @@ void hantei(Vector3& vMax, Vector3& vMin, AABB& aabb, NaviMesh& naviMesh, int ce
 		for (int y = 0; y < yCount; y++) {
 			//XY平面にある点(始点)から真下に線分を飛ばす。
 			Start = { Base_xValue[x], Base_yValue[y], baseVertex.z };
-			End = { Base_xValue[x], Base_yValue[y], baseVertex.z - 500 };
+			End = { Base_xValue[x], Base_yValue[y], baseVertex.z - 600 };
 			bool CD = IntersectPlaneAndLine(Start, End, naviMesh.m_cell[cellCount]);
 			if (CD == true) {
 				//printf("削除おおおおおおおおおお！！\n");
@@ -439,9 +443,13 @@ int main(int argc, char* argv[])
 			if (findSameVertex == 2) {
 				//同じ頂点が2つ見つかったので、こいつは隣接セル。
 				naviMesh.m_cell[serchCell].linkCell[linkNum] = &naviMesh.m_cell[isSerchedCell];
+				//隣接セル番号も保存しておく。
+				naviMesh.m_cell[serchCell].linkCellNumber[linkNum] = isSerchedCell;
 				//リンクセル番号を次のやつにしとく。
 				linkNum++;
 			}
+
+
 		}
 	}
 	naviMesh.Save(argv[2]);

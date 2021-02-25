@@ -5,6 +5,7 @@ void TklFile::LoadImplement(const char* filePath)
 {
 	auto fp = fopen(filePath, "rb");
 	if (fp == nullptr) {
+		MessageBoxA(nullptr, "tklFile Name is wrong", "error", MB_OK);
 		return;
 	}
 	//バージョン読み込み。
