@@ -157,14 +157,14 @@ void CalcAABB(AABB& aabb, Vector3& vMax, Vector3& vMin)
 {
 	//8頂点を計算＆代入していく。
 	//ZUPなことに注意！！
-	aabb.v[EnFupperLeft] = { vMin.x, vMin.y, vMax.z };
+	aabb.v[EnFupperLeft] = { vMin.x, vMax.y, vMin.z };
 	aabb.v[EnFlowerLeft] = { vMin.x, vMin.y, vMin.z };
-	aabb.v[EnFupperRight] = { vMax.x, vMin.y, vMax.z };
+	aabb.v[EnFupperRight] = { vMax.x, vMax.y, vMin.z };
 	aabb.v[EnFlowerRight] = { vMax.x, vMin.y, vMin.z };
 	aabb.v[EnBupperLeft] = { vMin.x, vMax.y, vMax.z };
-	aabb.v[EnBlowerLeft] = { vMin.x, vMax.y, vMin.z };
+	aabb.v[EnBlowerLeft] = { vMin.x, vMin.y, vMax.z };
 	aabb.v[EnBupperRight] = { vMax.x, vMax.y, vMax.z };
-	aabb.v[EnBlowerRight] = { vMax.x, vMax.y, vMin.z };
+	aabb.v[EnBlowerRight] = { vMax.x, vMin.y, vMax.z };
 }
 
 /// <summary>
@@ -186,9 +186,9 @@ bool IntersectPlaneAndLine(
 	Vector3 v1 = { 20.0f, 0.0f, 0.0f };
 	Vector3 v2 = { 0.0f, 20.0f, 0.0f };
 #else
-	Vector3 v0 = cell.pos[0];
-	Vector3 v1 = cell.pos[1];
-	Vector3 v2 = cell.pos[2];
+	Vector3 v0 = { cell.pos[0].x, cell.pos[0].z, cell.pos[0].y };
+	Vector3 v1 = { cell.pos[1].x, cell.pos[1].z, cell.pos[1].y };
+	Vector3 v2 = { cell.pos[2].x, cell.pos[2].z, cell.pos[2].y };
 #endif
 	//v0からv1。
 	Vector3 nom = v1 - v0;
@@ -273,21 +273,21 @@ void hantei(Vector3& vMax, Vector3& vMin, AABB& aabb, NaviMesh& naviMesh, int ce
 	const int stride = 5;
 	//各軸の線分を飛ばす数。
 	int xCount = (vMax.x - vMin.x) / stride;
-	int yCount = (vMax.y - vMin.y) / stride;	//こいつZ
+	int zCount = (vMax.z - vMin.z) / stride;	//こいつZ
 
 	//基点とする頂点。
 	const Vector3 baseVertex = aabb.v[EnFupperLeft];
 
 	////基盤のXYZ軸の頂点座標を求める。
 	////基盤頂点座標リスト。普通の配列でやると、サイズ確保量が決め打ちになって気持ち悪いのでvectorでやろう。
-	vector<float> Base_xValue, Base_yValue;
+	vector<float> Base_xValue, Base_zValue;
 	for (int vX = 0; vX < xCount; vX++) {
 		float X = baseVertex.x + vX * stride;
 		Base_xValue.push_back(X);
 	}
-	for (int vY = 0; vY < yCount; vY++) {
-		float Y = baseVertex.y + vY * stride;
-		Base_yValue.push_back(Y);
+	for (int vZ = 0; vZ < zCount; vZ++) {
+		float Z = baseVertex.z + vZ * stride;
+		Base_zValue.push_back(Z);
 	}
 
 	
@@ -309,10 +309,10 @@ void hantei(Vector3& vMax, Vector3& vMin, AABB& aabb, NaviMesh& naviMesh, int ce
 	}
 #else
 	for (int x = 0; x < xCount; x++) {
-		for (int y = 0; y < yCount; y++) {
+		for (int z = 0; z < zCount; z++) {
 			//XY平面にある点(始点)から真下に線分を飛ばす。
-			Start = { Base_xValue[x], Base_yValue[y], baseVertex.z };
-			End = { Base_xValue[x], Base_yValue[y], baseVertex.z - 600 };
+			Start = { Base_xValue[x],baseVertex.y , Base_zValue[z] };
+			End = { Base_xValue[x], baseVertex.y - 1000, Base_zValue[z] };
 			bool CD = IntersectPlaneAndLine(Start, End, naviMesh.m_cell[cellCount]);
 			if (CD == true) {
 				//printf("削除おおおおおおおおおお！！\n");
@@ -388,21 +388,22 @@ int main(int argc, char* argv[])
 		Quaternion levelRot = level.GetLevelObj(i).rotatatin;
 		Vector3 scale = level.GetLevelObj(i).scale;
 		//変換座標を行列化していく。
-		Matrix mTrans, mRot, mScale;
+		Matrix mBias, mTrans, mRot, mScale;
 		mTrans.MakeTranslation(levelPos);
 		mRot.MakeRotationFromQuaternion(levelRot);
 		mScale.MakeScaling(scale);
 		//ワールド行列を求める。
 		Matrix world = mScale * mRot * mTrans;
 
+		vMax = { -FLT_MAX, -FLT_MAX , -FLT_MAX };
+		vMin = { FLT_MAX, FLT_MAX , FLT_MAX };
 		//ここからローカルAABBにワールド行列を乗算していく。
 		for (int vCount = 0; vCount < EnRectangular_Num; vCount++) {
 			//ワールド座標軸に変換。
-			aabb.v[vCount].TransformCoord(world);
+			world.Mul(aabb.v[vCount]);
+			vMax.Max(aabb.v[vCount]);
+			vMin.Min(aabb.v[vCount]);
 		}
-		//最大頂点もワールド行列に変換する。
-		vMin.TransformCoord(world);
-		vMax.TransformCoord(world);
 		//ここから衝突判定。
 		//meshすべてのセルとAABBとの当たり判定を取って、
 		//セルとAABBが衝突していたら、該当セルを削除。リストは降順から回さないと削除したときにおかしくなるはず。

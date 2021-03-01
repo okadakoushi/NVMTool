@@ -19,9 +19,9 @@ class Bone;
 /// フックできる範囲。
 /// </summary>
 struct LevelObjectData {
-	Vector3 position;		//座標。
-	Quaternion rotatatin;	//回転。
-	Vector3 scale;			//拡大。
+	Vector3 position = g_vec3Zero;		//座標。
+	Quaternion rotatatin = g_quatIdentity;	//回転。
+	Vector3 scale = g_vec3One;			//拡大。
 	const wchar_t* name = nullptr;	//名前。
 	bool isShadowCaster;	//シャドウキャスター。
 	bool isShadowReceiver;	//シャドウレシーバー。

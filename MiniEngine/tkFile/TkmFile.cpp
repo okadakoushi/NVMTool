@@ -342,6 +342,8 @@ void TkmFile::Load(const char* filePath)
 			vMax.Max(vertex.pos);
 			vMin.Min(vertex.pos);
 
+
+
 			//vertex.normal.Set(vertexTmp.normal[0], vertexTmp.normal[1], vertexTmp.normal[2]);
 			//別にNavMesh形成するのにいらへんよな！
 			//vertex.normal = g_vec3Zero;
@@ -391,6 +393,10 @@ void TkmFile::Load(const char* filePath)
 	}
 	//接ベクトルと従ベクトルを構築する。
 	BuildTangentAndBiNormal();
+
+	//max系の軸変換。
+	vMax = { vMax.x, vMax.z , vMax.y };
+	vMin = { vMin.x, vMin.z , vMin.y };
 
 	fclose(fp);
 

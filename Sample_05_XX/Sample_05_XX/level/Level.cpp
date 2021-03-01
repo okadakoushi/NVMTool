@@ -36,17 +36,16 @@ void Level::Init(const char* filePath, std::function<bool(LevelObjectData& obj)>
 			Vector3 scale;
 			bone->CalcWorldTRS(objData[i].position, objData[i].rotatatin, objData[i].scale);
 			//Maxと軸が違うので補正。
-			//ツールではAABBとるときに行ってるのでやらない。
-			//float fix = objData[i].position.y;
-			//objData[i].position.y = objData[i].position.z;
-			//objData[i].position.z = -fix;
+			float fix = objData[i].position.y;
+			objData[i].position.y = objData[i].position.z;
+			objData[i].position.z = fix;
 
-			//fix = objData[i].rotatatin.y;
-			//objData[i].rotatatin.y = objData[i].rotatatin.z;
-			//objData[i].rotatatin.z = -fix;
+			fix = objData[i].rotatatin.y;
+			objData[i].rotatatin.y = objData[i].rotatatin.z;
+			objData[i].rotatatin.x = fix;
 
-			////入れ替え。
-			//std::swap(objData[i].scale.y, objData[i].scale.z);
+			//入れ替え。
+			std::swap(objData[i].scale.y, objData[i].scale.z);
 			//パラメーター。
 			objData[i].name = bone->GetName();
 			//objData.isShadowCaster = Params.at(i).isShadowCaster;
@@ -142,21 +141,21 @@ void Level::BuildBoneMatrices()
 			m_bones.push_back(std::move(bone));
 		});
 	
-	for (auto& bone : m_bones) {
-		if (bone->GetParentBoneNo() != -1) {
-			m_bones.at(bone->GetParentBoneNo())->AddChild(bone.get());
-			//ローカルマトリクス計算。
-			const Matrix& parentMatrix = m_bones.at(bone->GetParentBoneNo())->GetInvBindPoseMatrix();
-			Matrix localMatrix;
-			//平行移動行列はかき消す。
-			localMatrix = bone->GetBindPoseMatrix() * parentMatrix;
-			bone->SetLocalMatrix(localMatrix);
-		}
-		else {
-			//これ以上親いない。
-			bone->SetLocalMatrix(bone->GetBindPoseMatrix());
-		}
-	}
+	//for (auto& bone : m_bones) {
+	//	if (bone->GetParentBoneNo() != -1) {
+	//		m_bones.at(bone->GetParentBoneNo())->AddChild(bone.get());
+	//		//ローカルマトリクス計算。
+	//		const Matrix& parentMatrix = m_bones.at(bone->GetParentBoneNo())->GetInvBindPoseMatrix();
+	//		Matrix localMatrix;
+	//		//平行移動行列はかき消す。
+	//		localMatrix = bone->GetBindPoseMatrix() * parentMatrix;
+	//		bone->SetLocalMatrix(localMatrix);
+	//	}
+	//	else {
+	//		//これ以上親いない。
+	//		bone->SetLocalMatrix(bone->GetBindPoseMatrix());
+	//	}
+	//}
 
 	//ボーン行列を確保。
 	m_boneMatirxs = std::make_unique<Matrix[]>(m_bones.size());
