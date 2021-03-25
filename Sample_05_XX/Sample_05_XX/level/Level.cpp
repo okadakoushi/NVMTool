@@ -42,7 +42,7 @@ void Level::Init(const char* filePath, std::function<bool(LevelObjectData& obj)>
 
 			fix = objData[i].rotatatin.y;
 			objData[i].rotatatin.y = objData[i].rotatatin.z;
-			objData[i].rotatatin.x = fix;
+			objData[i].rotatatin.z = -fix;
 
 			//ì¸ÇÍë÷Ç¶ÅB
 			std::swap(objData[i].scale.y, objData[i].scale.z);

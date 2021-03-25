@@ -7,6 +7,7 @@
 #include "tkFile/tkmFile.h"
 #include "level/TklFile.h"
 #include "level/Level.h"
+#include <comdef.h>
 
 //直方体を構成する８頂点。
 enum Rectangular {
@@ -186,9 +187,9 @@ bool IntersectPlaneAndLine(
 	Vector3 v1 = { 20.0f, 0.0f, 0.0f };
 	Vector3 v2 = { 0.0f, 20.0f, 0.0f };
 #else
-	Vector3 v0 = { cell.pos[0].x, cell.pos[0].z, cell.pos[0].y };
-	Vector3 v1 = { cell.pos[1].x, cell.pos[1].z, cell.pos[1].y };
-	Vector3 v2 = { cell.pos[2].x, cell.pos[2].z, cell.pos[2].y };
+	Vector3 v0 = cell.pos[0];//{ cell.pos[0].x, cell.pos[0].z, cell.pos[0].y };
+	Vector3 v1 = cell.pos[1];//{ cell.pos[1].x, cell.pos[1].z, cell.pos[1].y };
+	Vector3 v2 = cell.pos[2];//{ cell.pos[2].x, cell.pos[2].z, cell.pos[2].y };
 #endif
 	//v0からv1。
 	Vector3 nom = v1 - v0;
@@ -249,6 +250,10 @@ bool IntersectPlaneAndLine(
 				//衝突してた。
 				return true;
 			}
+		}
+		else {
+			//test
+			int i = 0;
 		}
 	}
 
@@ -315,7 +320,6 @@ void hantei(Vector3& vMax, Vector3& vMin, AABB& aabb, NaviMesh& naviMesh, int ce
 			End = { Base_xValue[x], baseVertex.y - 1000, Base_zValue[z] };
 			bool CD = IntersectPlaneAndLine(Start, End, naviMesh.m_cell[cellCount]);
 			if (CD == true) {
-				//printf("削除おおおおおおおおおお！！\n");
 				naviMesh.m_cell.erase(naviMesh.m_cell.begin() + cellCount);
 				return;
 			}
@@ -335,7 +339,7 @@ int main(int argc, char* argv[])
 		//引数が足りないのでヘルプを表示する。
 		std::cout << "ナビゲーションメッシュ生成ツール\n";
 		std::cout << "mknvm.exe tkmFilePath nvmFilePath\n";
-		std::cout << "tkmFilePath・・・ナビゲーションメッシュの生成元のtkファイル\n";
+		std::cout << "tklFilePath・・・ナビゲーションメッシュの生成元のtklファイル\n";
 		std::cout << "nvmFilePath・・・生成したナビゲーションメッシュのファイルパス\n";
 		return 0;
 	}
@@ -371,6 +375,12 @@ int main(int argc, char* argv[])
 				BuildCellsFromOneMesh(naviMesh, mesh.indexBuffer16Array, mesh);
 				BuildCellsFromOneMesh(naviMesh, mesh.indexBuffer32Array, mesh);
 				});
+			for (auto& cell : naviMesh.m_cell) {
+				//軸をYUPに変換しておく。
+				std::swap(cell.pos[0].y, cell.pos[0].z);
+				std::swap(cell.pos[1].y, cell.pos[1].z);
+				std::swap(cell.pos[2].y, cell.pos[2].z);
+			}
 			//NavMeshを作成したオブジェクトとは当たり判定を取る必要はないので処理をスキップ。
 			continue;
 		}
@@ -404,6 +414,14 @@ int main(int argc, char* argv[])
 			vMax.Max(aabb.v[vCount]);
 			vMin.Min(aabb.v[vCount]);
 		}
+		//補正。
+		vMax.z *= -1;
+		vMin.z *= -1;
+		Vector3 min = vMin;
+		vMin.z = vMax.z;
+		vMax.z = min.z;
+		CalcAABB(aabb, vMax, vMin);
+		
 		//ここから衝突判定。
 		//meshすべてのセルとAABBとの当たり判定を取って、
 		//セルとAABBが衝突していたら、該当セルを削除。リストは降順から回さないと削除したときにおかしくなるはず。
